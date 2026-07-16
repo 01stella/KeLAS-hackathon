@@ -211,12 +211,6 @@ export default function TrackScreen() {
       </ScrollView>
 
       {/* Static Bottom Tab Bar */}
-      <View style={styles.bottomTab}>
-        <TabItem icon="home-outline" label="Homepage" />
-        <TabItem icon="map" label="Track" active />
-        <TabItem icon="time-outline" label="History" />
-        <TabItem icon="person-outline" label="Profile" />
-      </View>
     </SafeAreaView>
   );
 }

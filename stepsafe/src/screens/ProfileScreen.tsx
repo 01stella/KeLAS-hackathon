@@ -117,12 +117,6 @@ export default function ProfileScreen() {
       </ScrollView>
 
       {/* Static Bottom Tab Bar */}
-      <View style={styles.bottomTab}>
-        <TabItem icon="home-outline" label="Homepage" />
-        <TabItem icon="map-outline" label="Track" />
-        <TabItem icon="time-outline" label="History" />
-        <TabItem icon="person" label="Profile" active />
-      </View>
     </SafeAreaView>
   );
 }

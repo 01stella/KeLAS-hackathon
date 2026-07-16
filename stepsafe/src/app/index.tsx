@@ -1,8 +1,7 @@
 import ProfileScreen from '../screens/ProfileScreen';
 import TrackingScreen from '../screens/TrackScreen';
+import HomeScreen from '../screens/HomeScreen';
 
-export default function HomeScreen() {
- // return <TrackingScreen />;
-  return <ProfileScreen />;
-
+export default function IndexRoute() {
+  return <HomeScreen />;
 }
