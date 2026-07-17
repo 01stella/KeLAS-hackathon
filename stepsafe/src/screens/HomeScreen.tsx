@@ -27,8 +27,11 @@ export default function HomeScreen() {
         <AppMap />
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
-        
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.overlay}
+        pointerEvents="box-none"
+      >        
         {/* Top Floating Search Bar */}
         <View style={styles.searchContainer}>
           <View style={styles.searchBox}>
