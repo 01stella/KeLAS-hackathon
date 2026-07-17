@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import AppMap from '../components/AppMap';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import AppMap from '../components/AppMap.web';
 import { 
   StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  Platform, StatusBar, KeyboardAvoidingView, PanResponder, Animated 
+  Platform, StatusBar, KeyboardAvoidingView, PanResponder, Animated, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -30,12 +30,104 @@ export default function HomeScreen() {
   const [journeyStartData, setJourneyStartData] = useState<any>(null);
 
   // Pull live BPM and color state from Context
-  const { bpm, statusColor } = useBiometrics();
+  const { bpm, setBpm, statusColor } = useBiometrics();
   // Access global journey history functions
   const { addJourney } = useJourney();
 
+  const [emergencyAlert, setEmergencyAlert] = useState<'idle' | 'warning' | 'sosSent'>('idle');
+  const [secondsRemaining, setSecondsRemaining] = useState(5);
+  const [isEmergencyScenarioActive, setIsEmergencyScenarioActive] = useState(false);
+  const [contactStatus, setContactStatus] = useState<'normal' | 'alerted'>('normal');
+
   // Boolean check
   const hasValidDestination = destination.trim().length > 0 && destination !== 'Set Destination';
+  const isHighHeartRate = bpm > 160;
+
+  // Reusable function to save the journey with dynamic status
+  const saveJourney = useCallback((status: 'Safe' | 'Anomaly detected', isAlert: boolean) => {
+    const endTime = Date.now();
+    const durationSeconds = Math.max(1, Math.floor((endTime - (journeyStartData?.startTime || endTime)) / 1000));
+    const now = new Date();
+    const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    addJourney({
+      id: endTime.toString(),
+      date: `Today, ${timeString}`,
+      origin: journeyStartData?.origin || 'Current Location',
+      destination: destination || 'Selected Destination',
+      duration: `${durationSeconds} secs`,
+      status: status,
+      isAlert: isAlert
+      // pathImage removed to delete hardcoded dummy data
+    });
+
+    setDestination('');
+  }, [addJourney, journeyStartData, destination]);
+
+  // Show the check-in as soon as the shared biometric reading enters the high-risk range.
+  useEffect(() => {
+    if (isHighHeartRate && emergencyAlert === 'idle') {
+      setSecondsRemaining(5);
+      setEmergencyAlert('warning');
+    }
+
+    if (!isHighHeartRate) {
+      setSecondsRemaining(5);
+      setEmergencyAlert('idle');
+    }
+  }, [emergencyAlert, isHighHeartRate]);
+
+  useEffect(() => {
+    if (emergencyAlert !== 'warning') return;
+
+    if (secondsRemaining === 0) {
+      setEmergencyAlert('sosSent');
+      setContactStatus('alerted');
+      // Record anomaly journey immediately when user fails to respond
+      if (isEmergencyScenarioActive) {
+        saveJourney('Anomaly detected', true);
+        setIsEmergencyScenarioActive(false);
+      }
+      return;
+    }
+
+    const countdown = setTimeout(() => {
+      setSecondsRemaining((seconds) => seconds - 1);
+    }, 1000);
+
+    return () => clearTimeout(countdown);
+  }, [emergencyAlert, secondsRemaining, isEmergencyScenarioActive, saveJourney]);
+
+  // Demo scenario: a journey gradually raises the simulated BPM until it reaches
+  // the existing high-heart-rate threshold and opens the safety check-in.
+  useEffect(() => {
+    if (!isEmergencyScenarioActive || emergencyAlert !== 'idle') return;
+
+    const heartRateIncrease = setInterval(() => {
+      setBpm(Math.min(bpm + 12, 172));
+    }, 500);
+
+    return () => clearInterval(heartRateIncrease);
+  }, [bpm, emergencyAlert, isEmergencyScenarioActive, setBpm]);
+
+
+  const confirmSafety = () => {
+    // In the current demo, acknowledging the alert returns the simulated reading to normal.
+    setBpm(76);
+    setSecondsRemaining(5);
+    setEmergencyAlert('idle');
+    setContactStatus('normal');
+    if (isEmergencyScenarioActive) {
+      saveJourney('Safe', false);
+      setIsEmergencyScenarioActive(false);
+    }
+  };
+
+  const dismissSosAlert = () => {
+    setBpm(76);
+    setEmergencyAlert('idle');
+    // We don't save the journey here anymore since it is now saved exactly when the SOS is triggered
+  };
 
   // --- VIRTUAL JOYSTICK LOGIC START ---
   const pan = useRef(new Animated.ValueXY()).current;
@@ -43,9 +135,9 @@ export default function HomeScreen() {
   
   // Refs to hold joystick direction and loop timer
   const joystickOffset = useRef({ x: 0, y: 0 });
-  const moveInterval = useRef<NodeJS.Timeout | null>(null);
+  const moveInterval = useRef<number | null>(null);
 
-  // Cleanup interval when component unmounts
+  // Cleanup alerted when component unmounts
   useEffect(() => {
     return () => {
       if (moveInterval.current) clearInterval(moveInterval.current);
@@ -157,6 +249,9 @@ export default function HomeScreen() {
       origin: currentLocationName !== 'Finding location...' ? currentLocationName : 'Current Location',
       startTime: Date.now()
     });
+    setBpm(76);
+    setContactStatus('normal');
+    setIsEmergencyScenarioActive(true);
     // Update state to start the journey animation in the map
     setIsJourneyStarted(true);
   };
@@ -167,32 +262,11 @@ export default function HomeScreen() {
         {/* Pass the callback function and journey status to the map */}
         <AppMap 
           userLocation={userCoords} 
-          onDestinationSelect={(address) => setDestination(address)} 
+          onDestinationSelect={(address: string) => setDestination(address)} 
           isJourneyStarted={isJourneyStarted}
-          onJourneyEnd={(finalLat, finalLng) => {
+          onJourneyEnd={(finalLat: number, finalLng: number) => {
             setIsJourneyStarted(false);
             
-            // Calculate duration and end time
-            const endTime = Date.now();
-            const diffMs = endTime - (journeyStartData?.startTime || endTime);
-            const diffSecs = Math.floor(diffMs / 1000); 
-            
-            const now = new Date();
-            const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-            // Add the completed journey to the global history context
-            addJourney({
-              id: Date.now().toString(),
-              date: `Today, ${timeString}`,
-              origin: journeyStartData?.origin || 'Unknown Location',
-              destination: destination,
-              duration: `${diffSecs} secs`, 
-              status: 'Safe',
-              isAlert: false,
-              pathImage: require('../../assets/images/historydummy/path1.png')
-            });
-
-            setDestination(''); 
             setUserCoords({ latitude: finalLat, longitude: finalLng });
           }}
         />
@@ -222,18 +296,24 @@ export default function HomeScreen() {
               </TouchableOpacity>
             )}
           </View>
-        </View>
 
-        {/* FLOATING RIGHT-SIDE BLE BADGE (Now Dynamic!) */}
-        <TouchableOpacity 
-          activeOpacity={0.8} 
-          style={styles.biometricBadge}
-        >
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor, marginRight: 6 }} />
-          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-            ⌚ <Text style={{ color: statusColor }}>♥</Text> {Math.round(bpm)}
-          </Text>
-        </TouchableOpacity>
+          <View style={styles.contactRow}>
+            <View style={styles.contactProfile}>
+              <Ionicons name="person" size={18} color="#FFFFFF" />
+            </View>
+            <View style={styles.contactMeta}>
+              <Text style={styles.contactName}>Mom</Text>
+              <Text style={styles.contactRelation}>Emergency Contact</Text>
+            </View>
+            <View style={[styles.contactDot, contactStatus === 'alerted' ? styles.contactDotAlert : styles.contactDotNormal]} />
+            <View style={styles.biometricBadgeInline}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor, marginRight: 6 }} />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                ⌚ <Text style={{ color: statusColor }}>♥</Text> {Math.round(bpm)}
+              </Text>
+            </View>
+          </View>
+        </View>
 
         {/* VIRTUAL JOYSTICK UI - Only render if journey has not started */}
         {userCoords && !isJourneyStarted && (
@@ -289,6 +369,51 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={emergencyAlert !== 'idle'}
+        transparent
+        animationType="fade"
+        onRequestClose={emergencyAlert === 'sosSent' ? dismissSosAlert : undefined}
+      >
+        <View style={styles.alertBackdrop}>
+          <View style={styles.alertDialog}>
+            <View style={[
+              styles.alertIcon,
+              emergencyAlert === 'warning' ? styles.alertIconWarning : styles.alertIconSent,
+            ]}>
+              <Ionicons
+                name={emergencyAlert === 'warning' ? 'heart' : 'checkmark'}
+                size={28}
+                color="#FFFFFF"
+              />
+            </View>
+
+            {emergencyAlert === 'warning' ? (
+              <>
+                <Text style={styles.alertTitle}>Are you okay?</Text>
+                <Text style={styles.alertMessage}>
+                  Your heartbeat is racing at {Math.round(bpm)} BPM. We will contact your emergency number if you do not respond.
+                </Text>
+                <Text style={styles.countdownText}>Sending SOS in {secondsRemaining}s</Text>
+                <TouchableOpacity style={styles.safeButton} onPress={confirmSafety}>
+                  <Text style={styles.safeButtonText}>I'm Okay</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.alertTitle}>SOS Message Sent</Text>
+                <Text style={styles.alertMessage}>
+                  No response was received. An SOS message has been sent to your emergency number.
+                </Text>
+                <TouchableOpacity style={styles.closeAlertButton} onPress={dismissSosAlert}>
+                  <Text style={styles.closeAlertButtonText}>Close</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -338,24 +463,87 @@ const styles = StyleSheet.create({
     color: '#111', 
     fontWeight: '500' 
   },
-  biometricBadge: { 
-    position: 'absolute', 
-    right: 16, 
-    top: 100, 
-    backgroundColor: '#FFFFFF', 
-    paddingHorizontal: 12, 
-    paddingVertical: 8, 
-    borderRadius: 24, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    shadowColor: '#0F172A', 
-    shadowOffset: { width: 0, height: 4 }, 
-    shadowOpacity: 0.15, 
-    shadowRadius: 8, 
-    elevation: 4, 
-    zIndex: 10, 
-    borderWidth: 1, 
-    borderColor: '#E2E8F0' 
+  contactRow: {
+    marginTop: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  contactProfile: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#3B82F6',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  contactMeta: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  contactName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#111827'
+  },
+  contactRelation: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2
+  },
+  contactDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
+    marginLeft: 4,
+  },
+  contactDotNormal: {
+    backgroundColor: '#9CA3AF'
+  },
+  contactDotAlert: {
+    backgroundColor: '#DC2626'
+  },
+  biometricBadgeInline: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0'
+  },
+  biometricBadge: {
+    position: 'absolute',
+    right: 16,
+    top: 100,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0'
   },
   joystickContainer: { 
     position: 'absolute', 
@@ -469,5 +657,79 @@ const styles = StyleSheet.create({
     color: '#FFF', 
     fontSize: 16, 
     fontWeight: '700' 
+  },
+  alertBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)'
+  },
+  alertDialog: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24
+  },
+  alertIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  alertIconWarning: {
+    backgroundColor: '#EF4444'
+  },
+  alertIconSent: {
+    backgroundColor: '#16A34A'
+  },
+  alertTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'center'
+  },
+  alertMessage: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#475569',
+    textAlign: 'center',
+    marginTop: 10
+  },
+  countdownText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#DC2626',
+    marginTop: 20
+  },
+  safeButton: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: '#16A34A',
+    borderRadius: 10,
+    paddingVertical: 14,
+    marginTop: 20
+  },
+  safeButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF'
+  },
+  closeAlertButton: {
+    width: '100%',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderRadius: 10,
+    paddingVertical: 14,
+    marginTop: 20
+  },
+  closeAlertButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF'
   },
 });
