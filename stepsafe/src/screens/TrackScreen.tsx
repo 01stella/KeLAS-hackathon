@@ -42,18 +42,27 @@ export default function TrackScreen() {
       triggerSOS();
     }, 5000);
 
-    Alert.alert(
-      "Safety Alert",
-      `Are you okay? The BPM is too ${bpm > 160 ? 'high' : 'low'}.`,
-      [
-        {
-          text: "I'm Safe",
-          onPress: () => cancelWarning(),
-          style: "cancel"
-        }
-      ],
-      { cancelable: false } 
-    );
+    if (Platform.OS === 'web') {
+      const isSafe = window.confirm(
+        `Safety Alert\n\nAre you okay? The BPM is too ${bpm > 160 ? 'high' : 'low'}.\n\nClick "OK" if you are safe, or "Cancel" to ignore.`
+      );
+      if (isSafe) {
+        cancelWarning();
+      }
+    } else {
+      Alert.alert(
+        "Safety Alert",
+        `Are you okay? The BPM is too ${bpm > 160 ? 'high' : 'low'}.`,
+        [
+          {
+            text: "I'm Safe",
+            onPress: () => cancelWarning(),
+            style: "cancel"
+          }
+        ],
+        { cancelable: false }
+      );
+    }
   };
 
   const cancelWarning = () => {
@@ -67,11 +76,15 @@ export default function TrackScreen() {
 
   const triggerSOS = () => {
     setIsWarningActive(false); 
-    
-    Alert.alert(
-      "SOS TRIGGERED", 
-      "No response received. Initiating WhatsApp emergency broadcast via Fonnte..."
-    );
+
+    if (Platform.OS === 'web') {
+      window.alert("SOS TRIGGERED\n\nNo response received. Initiating WhatsApp emergency broadcast via Fonnte...");
+    } else {
+      Alert.alert(
+        "SOS Triggered",
+        "No response received. Initiating WhatsApp emergency broadcast via Fonnte..."
+      );
+    }
   };
 
   return (
