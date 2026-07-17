@@ -281,14 +281,14 @@ export default function TrackScreen() {
             </View>
             <View style={styles.monitorItem}>
               <View style={[styles.monitorIconBg, {backgroundColor: '#EFF6FF'}]}>
-                <MaterialCommunityIcons name="fall" size={20} color="#3B82F6" />
+                <MaterialCommunityIcons name="alert-outline" size={20} color="#3B82F6" />
               </View>
               <Text style={styles.monitorTitle}>Fall Detection</Text>
               <Text style={styles.monitorSub}>Enabled</Text>
             </View>
             <View style={styles.monitorItem}>
               <View style={[styles.monitorIconBg, {backgroundColor: '#F3E8FF'}]}>
-                <Feather name="phone-call" size={18} color="#9333EA" />
+                <MaterialCommunityIcons name="alert-outline" size={20} color="#9333EA" />
               </View>
               <Text style={styles.monitorTitle}>Motion</Text>
               <Text style={styles.monitorSub}>Monitoring</Text>
