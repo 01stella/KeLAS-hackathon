@@ -2,20 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar, Switch, Alert } from 'react-native';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
+// Import the Context Hook
+import { useBiometrics } from '../context/BiometricContext';
 
 export default function TrackScreen() {
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
   
-  // State for BPM Logic
-  const [bpm, setBpm] = useState(75);
+  // Replace local state with Global Context
+  const { bpm, setBpm, isAbnormal, statusColor } = useBiometrics();
+  
   const [isWarningActive, setIsWarningActive] = useState(false);
   
   // Timer Ref for SOS
   const sosTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Derived state to check if current BPM is dangerous
-  const isAbnormal = bpm < 40 || bpm > 160;
-  const statusColor = isAbnormal ? '#EF4444' : '#22C55E';
 
   // Biometric Monitoring Effect
   useEffect(() => {

@@ -4,9 +4,14 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, StatusBa
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
+// Import the Context Hook
+import { useBiometrics } from '../context/BiometricContext';
 
 export default function HomeScreen() {
   const [destination, setDestination] = useState('');
+  
+  // Pull live BPM and color state from Context
+  const { bpm, statusColor } = useBiometrics();
 
   // Boolean check
   const hasValidDestination = destination.trim().length > 0 && destination !== 'Set Destination';
@@ -43,36 +48,36 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* FLOATING RIGHT-SIDE BLE BADGE */}
-          <TouchableOpacity 
-            activeOpacity={0.8}
-            style={{
-              position: 'absolute',
-              right: 16,
-              top: 100, 
-              backgroundColor: '#FFFFFF',
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 24,
-              flexDirection: 'row',
-              alignItems: 'center',
-              shadowColor: '#0F172A',
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.15,
-              shadowRadius: 8,
-              elevation: 4,
-              zIndex: 10,
-              borderWidth: 1,
-              borderColor: '#E2E8F0'
-            }}
-          >
-            {/* Glowing Green Connection Dot */}
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', marginRight: 6 }} />
-            
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-              ⌚ <Text style={{ color: '#10B981' }}>♥</Text> 76
-            </Text>
-          </TouchableOpacity>
+        {/* FLOATING RIGHT-SIDE BLE BADGE (Now Dynamic!) */}
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          style={{
+            position: 'absolute',
+            right: 16,
+            top: 100, 
+            backgroundColor: '#FFFFFF',
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+            borderRadius: 24,
+            flexDirection: 'row',
+            alignItems: 'center',
+            shadowColor: '#0F172A',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 8,
+            elevation: 4,
+            zIndex: 10,
+            borderWidth: 1,
+            borderColor: '#E2E8F0'
+          }}
+        >
+          {/* Dynamic Glowing Dot */}
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor, marginRight: 6 }} />
+          
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+            ⌚ <Text style={{ color: statusColor }}>♥</Text> {Math.round(bpm)}
+          </Text>
+        </TouchableOpacity>
 
         {/* Bottom Card */}
         <View style={styles.bottomPanel}>
@@ -142,9 +147,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   map: {
-  width: '100%',
-  height: '100%',
-},
+    width: '100%',
+    height: '100%',
+  },
   mapPlaceholderText: {
     color: '#9CA3AF',
     marginTop: 12,
