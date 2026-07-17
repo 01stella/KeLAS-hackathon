@@ -1,23 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 
-// Add props to receive coordinate data and journey status from HomeScreen
+// Update props to send the final coordinates back when journey ends
 interface AppMapProps {
   userLocation?: {
     latitude: number;
     longitude: number;
   } | null;
   onDestinationSelect?: (address: string) => void;
-  isJourneyStarted?: boolean; // New prop to check if journey started
+  isJourneyStarted?: boolean; 
+  onJourneyEnd?: (finalLat: number, finalLng: number) => void; // Updated callback
 }
 
-export default function AppMapWeb({ userLocation, onDestinationSelect, isJourneyStarted }: AppMapProps) {
+export default function AppMapWeb({ userLocation, onDestinationSelect, isJourneyStarted, onJourneyEnd }: AppMapProps) {
   const [LeafletComponents, setLeafletComponents] = useState<any>(null);
   const [destCoords, setDestCoords] = useState<{lat: number, lng: number} | null>(null);
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
   
   // State to handle the moving blue dot separately from joystick input
   const [activeLocation, setActiveLocation] = useState<{latitude: number, longitude: number} | null>(null);
+  
+  // State for the grey trail (breadcrumb history)
+  const [trailPath, setTrailPath] = useState<[number, number][]>([]);
 
   useEffect(() => {
     // Dynamically load react-leaflet for web
@@ -32,6 +36,20 @@ export default function AppMapWeb({ userLocation, onDestinationSelect, isJourney
     }
   }, [userLocation, isJourneyStarted]);
 
+  // Record every movement of the activeLocation into the trail history
+  useEffect(() => {
+    if (activeLocation) {
+      setTrailPath(prev => {
+        const lastPoint = prev[prev.length - 1];
+        // Prevent duplicate identical points to save memory
+        if (lastPoint && lastPoint[0] === activeLocation.latitude && lastPoint[1] === activeLocation.longitude) {
+          return prev;
+        }
+        return [...prev, [activeLocation.latitude, activeLocation.longitude]];
+      });
+    }
+  }, [activeLocation]);
+
   // Logic to move the blue dot along the route path when journey starts
   useEffect(() => {
     if (isJourneyStarted && routePath.length > 0) {
@@ -44,13 +62,25 @@ export default function AppMapWeb({ userLocation, onDestinationSelect, isJourney
           });
           currentStep++;
         } else {
+          // Destination reached! 
           clearInterval(moveInterval);
+          
+          const finalPos = routePath[routePath.length - 1];
+          
+          // Clear the active green route and red destination dot
+          setRoutePath([]);
+          setDestCoords(null);
+          
+          // Notify HomeScreen with the final coordinates to prevent snapping back
+          if (onJourneyEnd) {
+            onJourneyEnd(finalPos[0], finalPos[1]);
+          }
         }
-      }, 100); // 100ms per step for smooth animation, adjust if too fast/slow
+      }, 100); 
 
       return () => clearInterval(moveInterval);
     }
-  }, [isJourneyStarted, routePath]);
+  }, [isJourneyStarted, routePath, onJourneyEnd]);
 
   if (!LeafletComponents) return <div style={{ padding: 20 }}>Loading map module...</div>;
   if (!activeLocation) return <div style={{ padding: 20 }}>Finding your location...</div>;
@@ -124,6 +154,22 @@ export default function AppMapWeb({ userLocation, onDestinationSelect, isJourney
         {/* Listen for map clicks */}
         <MapEvents />
         
+        {/* Route Line (Green) */}
+        {routePath.length > 0 && (
+          <Polyline 
+            positions={routePath} 
+            pathOptions={{ color: '#10B981', weight: 6, opacity: 0.8 }} 
+          />
+        )}
+
+        {/* Grey Trail (Breadcrumbs History) */}
+        {trailPath.length > 1 && (
+          <Polyline 
+            positions={trailPath} 
+            pathOptions={{ color: '#64748B', weight: 5, opacity: 0.9, dashArray: '10, 10' }} 
+          />
+        )}
+
         {/* Start Point / Moving Blue Dot */}
         <CircleMarker
           center={[activeLocation.latitude, activeLocation.longitude]}
@@ -142,14 +188,6 @@ export default function AppMapWeb({ userLocation, onDestinationSelect, isJourney
           >
             <Popup>Destination</Popup>
           </CircleMarker>
-        )}
-
-        {/* Route Line (Green) */}
-        {routePath.length > 0 && (
-          <Polyline 
-            positions={routePath} 
-            pathOptions={{ color: '#10B981', weight: 6, opacity: 0.8 }} 
-          />
         )}
       </MapContainer>
     </div>

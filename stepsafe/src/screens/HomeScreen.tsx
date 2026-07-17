@@ -157,6 +157,13 @@ export default function HomeScreen() {
           userLocation={userCoords} 
           onDestinationSelect={(address) => setDestination(address)} 
           isJourneyStarted={isJourneyStarted}
+          onJourneyEnd={(finalLat, finalLng) => {
+            setIsJourneyStarted(false);
+            setDestination(''); 
+            // Crucial fix: Update the main coordinate state to the destination
+            // so the trail doesn't snap back to the start!
+            setUserCoords({ latitude: finalLat, longitude: finalLng });
+          }}
         />
       </View>
 
