@@ -9,6 +9,8 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 // Import the Context Hook
 import { useBiometrics } from '../context/BiometricContext';
+// Import new Journey Context
+import { useJourney } from '../context/JourneyContext';
 // Import location library to fetch device coordinates
 import * as Location from 'expo-location';
 
@@ -24,8 +26,13 @@ export default function HomeScreen() {
   // New state to track if the journey has started
   const [isJourneyStarted, setIsJourneyStarted] = useState(false);
 
+  // New state to track journey metadata
+  const [journeyStartData, setJourneyStartData] = useState<any>(null);
+
   // Pull live BPM and color state from Context
   const { bpm, statusColor } = useBiometrics();
+  // Access global journey history functions
+  const { addJourney } = useJourney();
 
   // Boolean check
   const hasValidDestination = destination.trim().length > 0 && destination !== 'Set Destination';
@@ -145,6 +152,11 @@ export default function HomeScreen() {
   }, []);
 
   const handleStartJourney = () => {
+    // Record data when journey starts
+    setJourneyStartData({
+      origin: currentLocationName !== 'Finding location...' ? currentLocationName : 'Current Location',
+      startTime: Date.now()
+    });
     // Update state to start the journey animation in the map
     setIsJourneyStarted(true);
   };
@@ -159,9 +171,28 @@ export default function HomeScreen() {
           isJourneyStarted={isJourneyStarted}
           onJourneyEnd={(finalLat, finalLng) => {
             setIsJourneyStarted(false);
+            
+            // Calculate duration and end time
+            const endTime = Date.now();
+            const diffMs = endTime - (journeyStartData?.startTime || endTime);
+            const diffSecs = Math.floor(diffMs / 1000); 
+            
+            const now = new Date();
+            const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            // Add the completed journey to the global history context
+            addJourney({
+              id: Date.now().toString(),
+              date: `Today, ${timeString}`,
+              origin: journeyStartData?.origin || 'Unknown Location',
+              destination: destination,
+              duration: `${diffSecs} secs`, 
+              status: 'Safe',
+              isAlert: false,
+              pathImage: require('../../assets/images/historydummy/path1.png')
+            });
+
             setDestination(''); 
-            // Crucial fix: Update the main coordinate state to the destination
-            // so the trail doesn't snap back to the start!
             setUserCoords({ latitude: finalLat, longitude: finalLng });
           }}
         />
@@ -226,7 +257,6 @@ export default function HomeScreen() {
         <View style={styles.bottomPanel}>
           <View style={styles.locationRow}>
             <View style={styles.dotCurrent} />
-            {/* Render the dynamically fetched location text */}
             <Text style={styles.locationText}>Current: {currentLocationName}</Text>
           </View>
           
