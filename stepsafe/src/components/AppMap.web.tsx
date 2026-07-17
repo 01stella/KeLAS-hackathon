@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 
-// 1. Add props to receive coordinate data from HomeScreen
+// Add new prop to send the destination address back to HomeScreen
 interface AppMapProps {
   userLocation?: {
     latitude: number;
     longitude: number;
   } | null;
+  onDestinationSelect?: (address: string) => void;
 }
 
-export default function AppMapWeb({ userLocation }: AppMapProps) {
+export default function AppMapWeb({ userLocation, onDestinationSelect }: AppMapProps) {
   const [LeafletComponents, setLeafletComponents] = useState<any>(null);
+  const [destCoords, setDestCoords] = useState<{lat: number, lng: number} | null>(null);
+  const [routePath, setRoutePath] = useState<[number, number][]>([]);
 
   useEffect(() => {
     // Dynamically load react-leaflet for web
@@ -19,17 +22,54 @@ export default function AppMapWeb({ userLocation }: AppMapProps) {
   }, []);
 
   if (!LeafletComponents) return <div style={{ padding: 20 }}>Loading map module...</div>;
-  
-  // If GPS from HomeScreen hasn't fetched coordinates yet, wait
   if (!userLocation) return <div style={{ padding: 20 }}>Finding your location...</div>;
 
-  const { MapContainer, TileLayer, CircleMarker, Popup, useMap } = LeafletComponents;
+  const { MapContainer, TileLayer, CircleMarker, Popup, Polyline, useMapEvents, useMap } = LeafletComponents;
 
-  // 2. Create logic to update map camera position when joystick moves
+  // Component to handle Right-Click (Long Press on web)
+  function MapEvents() {
+    useMapEvents({
+      // contextmenu is triggered by right-click on web or long-press on mobile web
+      contextmenu: async (e: any) => { 
+        const { lat, lng } = e.latlng;
+        setDestCoords({ lat, lng });
+
+        try {
+          // 1. Fetch walking route from Open Source Routing Machine (OSRM)
+          const routeRes = await fetch(`https://router.project-osrm.org/route/v1/foot/${userLocation!.longitude},${userLocation!.latitude};${lng},${lat}?overview=full&geometries=geojson`);
+          const routeData = await routeRes.json();
+          
+          if (routeData.routes && routeData.routes[0]) {
+            // Convert GeoJSON [lon, lat] to Leaflet [lat, lon]
+            const coords = routeData.routes[0].geometry.coordinates.map((c: any) => [c[1], c[0]]);
+            setRoutePath(coords);
+          }
+
+          // 2. Fetch destination name using OpenStreetMap
+          if (onDestinationSelect) {
+            const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+            const geoData = await geoRes.json();
+            
+            if (geoData && geoData.address) {
+              const street = geoData.address.road || geoData.address.pedestrian || '';
+              const city = geoData.address.city || geoData.address.town || geoData.address.state || '';
+              const finalAddress = street && city ? `${street}, ${city}` : street || city || 'Custom Destination';
+              
+              // Send address back to HomeScreen text input
+              onDestinationSelect(finalAddress);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch route data", err);
+        }
+      }
+    });
+    return null;
+  }
+
   function MapUpdater({ coords }: { coords: { latitude: number, longitude: number } }) {
     const map = useMap();
     useEffect(() => {
-      // Move camera without animation to prevent lag on web
       map.setView([coords.latitude, coords.longitude], map.getZoom(), { animate: false });
     }, [coords.latitude, coords.longitude, map]);
     return null;
@@ -47,22 +87,38 @@ export default function AppMapWeb({ userLocation }: AppMapProps) {
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        {/* Call the map camera updater component */}
         <MapUpdater coords={userLocation} />
         
-        {/* 3. Render the blue dot exactly at the joystick/GPS coordinates */}
+        {/* Listen for map clicks */}
+        <MapEvents />
+        
+        {/* Start Point (Blue Dot) */}
         <CircleMarker
           center={[userLocation.latitude, userLocation.longitude]}
           radius={8}
-          pathOptions={{
-            color: '#FFF',       // White border
-            fillColor: '#3B82F6',// Google Maps style blue color
-            fillOpacity: 1,
-            weight: 3,
-          }}
+          pathOptions={{ color: '#FFF', fillColor: '#3B82F6', fillOpacity: 1, weight: 3 }}
         >
           <Popup>Your Current Location</Popup>
         </CircleMarker>
+
+        {/* End Point (Red Dot) - Shows up when destination is set */}
+        {destCoords && (
+          <CircleMarker
+            center={[destCoords.lat, destCoords.lng]}
+            radius={8}
+            pathOptions={{ color: '#FFF', fillColor: '#EF4444', fillOpacity: 1, weight: 3 }}
+          >
+            <Popup>Destination</Popup>
+          </CircleMarker>
+        )}
+
+        {/* Route Line (Green) */}
+        {routePath.length > 0 && (
+          <Polyline 
+            positions={routePath} 
+            pathOptions={{ color: '#10B981', weight: 6, opacity: 0.8 }} 
+          />
+        )}
       </MapContainer>
     </div>
   );
