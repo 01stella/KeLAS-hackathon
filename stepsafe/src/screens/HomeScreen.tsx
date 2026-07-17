@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppMap from '../components/AppMap';
 import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, StatusBar, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -6,15 +6,68 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 // Import the Context Hook
 import { useBiometrics } from '../context/BiometricContext';
+// Import location library to fetch device coordinates
+import * as Location from 'expo-location';
 
 export default function HomeScreen() {
   const [destination, setDestination] = useState('');
   
+  // State to hold dynamic current location text
+  const [currentLocationName, setCurrentLocationName] = useState('Finding location...');
+
   // Pull live BPM and color state from Context
   const { bpm, statusColor } = useBiometrics();
 
   // Boolean check
   const hasValidDestination = destination.trim().length > 0 && destination !== 'Set Destination';
+
+  // Request permission and fetch user location on component mount
+  useEffect(() => {
+    (async () => {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setCurrentLocationName('Location permission denied');
+        return;
+      }
+
+      try {
+        let location = await Location.getCurrentPositionAsync({});
+        
+        // Custom logic for Web using OpenStreetMap API
+        if (Platform.OS === 'web') {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${location.coords.latitude}&lon=${location.coords.longitude}`
+          );
+          const data = await response.json();
+          
+          if (data && data.address) {
+            const street = data.address.road || data.address.pedestrian || '';
+            const city = data.address.city || data.address.town || data.address.state || '';
+            setCurrentLocationName(street && city ? `${street}, ${city}` : street || city || 'Location found');
+          } else {
+            setCurrentLocationName('Location found (Name unavailable)');
+          }
+        } else {
+          // Default Expo logic for iOS/Android
+          let address = await Location.reverseGeocodeAsync({
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude
+          });
+
+          if (address && address.length > 0) {
+            const place = address[0];
+            const street = place.street || place.name || '';
+            const city = place.city || place.subregion || '';
+            setCurrentLocationName(street && city ? `${street}, ${city}` : street || city);
+          } else {
+            setCurrentLocationName('Location found (Name unavailable)');
+          }
+        }
+      } catch (error) {
+        setCurrentLocationName('Failed to fetch location');
+      }
+    })();
+  }, []);
 
   const handleStartJourney = () => {
     // Navigate to the Track tab when they start the journey
@@ -86,7 +139,8 @@ export default function HomeScreen() {
         <View style={styles.bottomPanel}>
           <View style={styles.locationRow}>
             <View style={styles.dotCurrent} />
-            <Text style={styles.locationText}>Current: Universitas Multimedia Nusantara</Text>
+            {/* Render the dynamically fetched location text */}
+            <Text style={styles.locationText}>Current: {currentLocationName}</Text>
           </View>
           
           <View style={styles.locationConnector} />
@@ -123,7 +177,7 @@ export default function HomeScreen() {
             onPress={handleStartJourney}
             disabled={!destination}
           >
-            <Text style={styles.startButtonText}>Start Biometric Tracking</Text>
+            <Text style={styles.startButtonText}>Start Journey Tracking</Text>
             <Feather name="activity" size={20} color="#FFF" style={{ marginLeft: 8 }} />
           </TouchableOpacity>
         </View>
@@ -163,7 +217,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     padding: 20,
-    paddingBottom: 100, // Space for Navbar
+    paddingBottom: 100, 
   },
   searchContainer: {
     marginTop: 10,
@@ -212,7 +266,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#3B82F6', // Blue
+    backgroundColor: '#3B82F6', 
     borderWidth: 3,
     borderColor: '#DBEAFE',
   },
@@ -220,7 +274,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#EF4444', // Red
+    backgroundColor: '#EF4444', 
     borderWidth: 3,
     borderColor: '#FEE2E2',
   },
@@ -232,7 +286,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   startButton: {
-    backgroundColor: '#22C55E', // Safe Green
+    backgroundColor: '#22C55E', 
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
