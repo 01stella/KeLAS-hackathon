@@ -69,13 +69,14 @@ export default function HomeScreen() {
     if (isHighHeartRate && emergencyAlert === 'idle') {
       setSecondsRemaining(5);
       setEmergencyAlert('warning');
+      setIsJourneyStarted(false);
     }
 
     if (!isHighHeartRate) {
       setSecondsRemaining(5);
       setEmergencyAlert('idle');
     }
-  }, [emergencyAlert, isHighHeartRate]);
+  }, [emergencyAlert, isHighHeartRate, setIsJourneyStarted]);
 
   useEffect(() => {
     if (emergencyAlert !== 'warning') return;
@@ -83,6 +84,7 @@ export default function HomeScreen() {
     if (secondsRemaining === 0) {
       setEmergencyAlert('sosSent');
       setContactStatus('alerted');
+      setIsJourneyStarted(false);
       // Record anomaly journey immediately when user fails to respond
       if (isEmergencyScenarioActive) {
         saveJourney('Anomaly detected', true);
@@ -117,6 +119,7 @@ export default function HomeScreen() {
     setSecondsRemaining(5);
     setEmergencyAlert('idle');
     setContactStatus('normal');
+    setIsJourneyStarted(false);
     if (isEmergencyScenarioActive) {
       saveJourney('Safe', false);
       setIsEmergencyScenarioActive(false);
@@ -126,6 +129,8 @@ export default function HomeScreen() {
   const dismissSosAlert = () => {
     setBpm(76);
     setEmergencyAlert('idle');
+    setIsJourneyStarted(false);
+    setIsEmergencyScenarioActive(false);
     // We don't save the journey here anymore since it is now saved exactly when the SOS is triggered
   };
 

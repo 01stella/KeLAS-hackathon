@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, SafeAreaView, Platform, StatusBar, TouchableOpacity, Modal, Image } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
-// Import the journey context to fetch global history data[cite: 6]
 import { useJourney } from '../context/JourneyContext';
 
 export default function HistoryScreen() {
@@ -76,12 +75,18 @@ export default function HistoryScreen() {
               </TouchableOpacity>
             </View>
 
-            <Image 
-              source={selectedJourney?.pathImage} // Uses the path linked in the data[cite: 5]
-              style={styles.mapPathImage} 
-              resizeMode="cover" 
-            />
-            
+            {selectedJourney?.pathImage ? (
+              <Image 
+                source={selectedJourney.pathImage} 
+                style={styles.mapPathImage} 
+                resizeMode="cover" 
+              />
+            ) : (
+              <View style={styles.mapPlaceholder}>
+                <Text style={styles.mapPlaceholderText}>Route preview unavailable.</Text>
+              </View>
+            )}
+
             <View style={{ padding: 20 }}>
               {/* Origin to Destination Path */}
               <View style={styles.routePathContainer}>
@@ -287,5 +292,21 @@ const styles = StyleSheet.create({
     height: 10, 
     borderRadius: 5, 
     backgroundColor: '#EF4444' 
+  },
+
+    mapPreview: {
+    width: '100%',
+    height: 250,
+  },
+  mapPlaceholder: {
+    width: '100%',
+    height: 250,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  mapPlaceholderText: {
+    color: '#6B7280',
+    fontSize: 14,
   },
 });

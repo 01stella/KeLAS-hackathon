@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import 'leaflet/dist/leaflet.css';
 
 // Update props to send the final coordinates back when journey ends
 interface AppMapProps {
@@ -27,6 +26,17 @@ export default function AppMapWeb({ userLocation, onDestinationSelect, isJourney
     // Dynamically load react-leaflet for web
     const rl = require('react-leaflet');
     setLeafletComponents(rl);
+
+    // Inject Leaflet CSS from CDN to avoid bundling local image URLs in Expo web
+    const styleId = 'leaflet-cdn-css';
+    if (!document.getElementById(styleId)) {
+      const link = document.createElement('link');
+      link.id = styleId;
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      link.crossOrigin = '';
+      document.head.appendChild(link);
+    }
   }, []);
 
   // Sync manual joystick movement with the active location dot

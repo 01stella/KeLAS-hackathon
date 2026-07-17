@@ -30,7 +30,7 @@ export const JourneyProvider = ({ children }: any) => {
 
   // Function to add a new journey record to the global history state
   const addJourney = (journey: any) => {
-    setHistory((prev: any) => [journey, ...prev]);
+    setHistory((prevHistory) => [journey, ...prevHistory]);
   };
 
   return (
