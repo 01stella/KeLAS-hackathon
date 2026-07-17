@@ -1,19 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import 'leaflet/dist/leaflet.css';
 
-// Add new prop to send the destination address back to HomeScreen
+// Add props to receive coordinate data and journey status from HomeScreen
 interface AppMapProps {
   userLocation?: {
     latitude: number;
     longitude: number;
   } | null;
   onDestinationSelect?: (address: string) => void;
+  isJourneyStarted?: boolean; // New prop to check if journey started
 }
 
-export default function AppMapWeb({ userLocation, onDestinationSelect }: AppMapProps) {
+export default function AppMapWeb({ userLocation, onDestinationSelect, isJourneyStarted }: AppMapProps) {
   const [LeafletComponents, setLeafletComponents] = useState<any>(null);
   const [destCoords, setDestCoords] = useState<{lat: number, lng: number} | null>(null);
   const [routePath, setRoutePath] = useState<[number, number][]>([]);
+  
+  // State to handle the moving blue dot separately from joystick input
+  const [activeLocation, setActiveLocation] = useState<{latitude: number, longitude: number} | null>(null);
 
   useEffect(() => {
     // Dynamically load react-leaflet for web
@@ -21,22 +25,51 @@ export default function AppMapWeb({ userLocation, onDestinationSelect }: AppMapP
     setLeafletComponents(rl);
   }, []);
 
+  // Sync manual joystick movement with the active location dot
+  useEffect(() => {
+    if (!isJourneyStarted && userLocation) {
+      setActiveLocation(userLocation);
+    }
+  }, [userLocation, isJourneyStarted]);
+
+  // Logic to move the blue dot along the route path when journey starts
+  useEffect(() => {
+    if (isJourneyStarted && routePath.length > 0) {
+      let currentStep = 0;
+      const moveInterval = setInterval(() => {
+        if (currentStep < routePath.length) {
+          setActiveLocation({
+            latitude: routePath[currentStep][0],
+            longitude: routePath[currentStep][1]
+          });
+          currentStep++;
+        } else {
+          clearInterval(moveInterval);
+        }
+      }, 100); // 100ms per step for smooth animation, adjust if too fast/slow
+
+      return () => clearInterval(moveInterval);
+    }
+  }, [isJourneyStarted, routePath]);
+
   if (!LeafletComponents) return <div style={{ padding: 20 }}>Loading map module...</div>;
-  if (!userLocation) return <div style={{ padding: 20 }}>Finding your location...</div>;
+  if (!activeLocation) return <div style={{ padding: 20 }}>Finding your location...</div>;
 
   const { MapContainer, TileLayer, CircleMarker, Popup, Polyline, useMapEvents, useMap } = LeafletComponents;
 
   // Component to handle Right-Click (Long Press on web)
   function MapEvents() {
     useMapEvents({
-      // contextmenu is triggered by right-click on web or long-press on mobile web
       contextmenu: async (e: any) => { 
+        // Prevent setting new destination if journey already started
+        if (isJourneyStarted) return; 
+
         const { lat, lng } = e.latlng;
         setDestCoords({ lat, lng });
 
         try {
           // 1. Fetch walking route from Open Source Routing Machine (OSRM)
-          const routeRes = await fetch(`https://router.project-osrm.org/route/v1/foot/${userLocation!.longitude},${userLocation!.latitude};${lng},${lat}?overview=full&geometries=geojson`);
+          const routeRes = await fetch(`https://router.project-osrm.org/route/v1/foot/${activeLocation!.longitude},${activeLocation!.latitude};${lng},${lat}?overview=full&geometries=geojson`);
           const routeData = await routeRes.json();
           
           if (routeData.routes && routeData.routes[0]) {
@@ -55,7 +88,6 @@ export default function AppMapWeb({ userLocation, onDestinationSelect }: AppMapP
               const city = geoData.address.city || geoData.address.town || geoData.address.state || '';
               const finalAddress = street && city ? `${street}, ${city}` : street || city || 'Custom Destination';
               
-              // Send address back to HomeScreen text input
               onDestinationSelect(finalAddress);
             }
           }
@@ -78,7 +110,7 @@ export default function AppMapWeb({ userLocation, onDestinationSelect }: AppMapP
   return (
     <div style={{ width: '100%', height: '100%', zIndex: 1 }}>
       <MapContainer
-        center={[userLocation.latitude, userLocation.longitude]}
+        center={[activeLocation.latitude, activeLocation.longitude]}
         zoom={16}
         style={{ width: '100%', height: '100%' }}
       >
@@ -87,14 +119,14 @@ export default function AppMapWeb({ userLocation, onDestinationSelect }: AppMapP
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         
-        <MapUpdater coords={userLocation} />
+        <MapUpdater coords={activeLocation} />
         
         {/* Listen for map clicks */}
         <MapEvents />
         
-        {/* Start Point (Blue Dot) */}
+        {/* Start Point / Moving Blue Dot */}
         <CircleMarker
-          center={[userLocation.latitude, userLocation.longitude]}
+          center={[activeLocation.latitude, activeLocation.longitude]}
           radius={8}
           pathOptions={{ color: '#FFF', fillColor: '#3B82F6', fillOpacity: 1, weight: 3 }}
         >

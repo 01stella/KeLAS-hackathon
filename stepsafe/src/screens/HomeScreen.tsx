@@ -21,6 +21,9 @@ export default function HomeScreen() {
   // State to store raw GPS coordinates for the map
   const [userCoords, setUserCoords] = useState<{latitude: number, longitude: number} | null>(null);
 
+  // New state to track if the journey has started
+  const [isJourneyStarted, setIsJourneyStarted] = useState(false);
+
   // Pull live BPM and color state from Context
   const { bpm, statusColor } = useBiometrics();
 
@@ -142,17 +145,18 @@ export default function HomeScreen() {
   }, []);
 
   const handleStartJourney = () => {
-    // Navigate to the Track tab when they start the journey
-    router.navigate('/track' as any);
+    // Update state to start the journey animation in the map
+    setIsJourneyStarted(true);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.mapBackground}>
-        {/* Pass the callback function to receive the destination address from the map */}
+        {/* Pass the callback function and journey status to the map */}
         <AppMap 
           userLocation={userCoords} 
           onDestinationSelect={(address) => setDestination(address)} 
+          isJourneyStarted={isJourneyStarted}
         />
       </View>
 
@@ -172,8 +176,9 @@ export default function HomeScreen() {
               placeholderTextColor="#9CA3AF"
               value={destination}
               onChangeText={setDestination}
+              editable={!isJourneyStarted}
             />
-            {destination.length > 0 && (
+            {destination.length > 0 && !isJourneyStarted && (
               <TouchableOpacity onPress={() => setDestination('')}>
                 <Ionicons name="close-circle" size={20} color="#D1D5DB" />
               </TouchableOpacity>
@@ -192,8 +197,8 @@ export default function HomeScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* VIRTUAL JOYSTICK UI */}
-        {userCoords && (
+        {/* VIRTUAL JOYSTICK UI - Only render if journey has not started */}
+        {userCoords && !isJourneyStarted && (
           <View style={styles.joystickContainer}>
             <View style={styles.joystickBase}>
               <Animated.View
@@ -236,11 +241,13 @@ export default function HomeScreen() {
           )}
 
           <TouchableOpacity 
-            style={[styles.startButton, !destination && styles.startButtonDisabled]} 
+            style={[styles.startButton, (!destination || isJourneyStarted) && styles.startButtonDisabled]} 
             onPress={handleStartJourney}
-            disabled={!destination}
+            disabled={!destination || isJourneyStarted}
           >
-            <Text style={styles.startButtonText}>Start Journey Tracking</Text>
+            <Text style={styles.startButtonText}>
+              {isJourneyStarted ? 'Tracking Active...' : 'Start Journey Tracking'}
+            </Text>
             <Feather name="activity" size={20} color="#FFF" style={{ marginLeft: 8 }} />
           </TouchableOpacity>
         </View>
