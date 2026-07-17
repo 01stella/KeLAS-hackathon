@@ -8,6 +8,9 @@ import { router } from 'expo-router';
 export default function HomeScreen() {
   const [destination, setDestination] = useState('');
 
+  // Boolean check
+  const hasValidDestination = destination.trim().length > 0 && destination !== 'Set Destination';
+
   const handleStartJourney = () => {
     // Navigate to the Track tab when they start the journey
     router.navigate('/track' as any);
@@ -40,7 +43,38 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Bottom Floating Action Panel */}
+        {/* FLOATING RIGHT-SIDE BLE BADGE */}
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            style={{
+              position: 'absolute',
+              right: 16,
+              top: 100, 
+              backgroundColor: '#FFFFFF',
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 24,
+              flexDirection: 'row',
+              alignItems: 'center',
+              shadowColor: '#0F172A',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.15,
+              shadowRadius: 8,
+              elevation: 4,
+              zIndex: 10,
+              borderWidth: 1,
+              borderColor: '#E2E8F0'
+            }}
+          >
+            {/* Glowing Green Connection Dot */}
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', marginRight: 6 }} />
+            
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+              ⌚ <Text style={{ color: '#10B981' }}>♥</Text> 76
+            </Text>
+          </TouchableOpacity>
+
+        {/* Bottom Card */}
         <View style={styles.bottomPanel}>
           <View style={styles.locationRow}>
             <View style={styles.dotCurrent} />
@@ -56,26 +90,25 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          {/* INTEGRATED CARD BADGE */}
-          <View style={{ 
-            flexDirection: 'row', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            backgroundColor: '#F8FAFC', 
-            paddingHorizontal: 10, 
-            paddingVertical: 6, 
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: '#E2E8F0',
-            marginBottom: 12 
-          }}>
-            <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '500' }}>
-              ⌚ Smartwatch Paired
-            </Text>
-            <Text style={{ color: '#0F172A', fontSize: 12, fontWeight: 'bold' }}>
-              <Text style={{ color: '#10B981' }}>♥</Text> 76 BPM
-            </Text>
-          </View>
+          {/* CONDITIONAL ROUTE METRICS: Only renders when destination exists */}
+          {!!destination && (
+            <View style={{ 
+              flexDirection: 'row', 
+              justifyContent: 'space-between', 
+              alignItems: 'center',
+              backgroundColor: '#F8FAFC',
+              paddingHorizontal: 12,
+              paddingVertical: 10,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: '#F1F5F9',
+              marginBottom: 16,
+              marginTop: 8
+            }}>
+              <Text style={{ color: '#10B981', fontWeight: 'bold', fontSize: 14 }}>🛡️ 92/100 Safe Path</Text>
+              <Text style={{ color: '#64748B', fontWeight: '600', fontSize: 13 }}>15 mins • 1.2 km</Text>
+            </View>
+          )}
 
           <TouchableOpacity 
             style={[styles.startButton, !destination && styles.startButtonDisabled]} 
