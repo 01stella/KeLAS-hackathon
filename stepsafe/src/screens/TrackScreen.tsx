@@ -260,14 +260,6 @@ export default function TrackScreen() {
                 <Text style={styles.cardSubtitle}>We'll alert your contacts if an emergency is detected</Text>
               </View>
             </View>
-            <Switch
-              trackColor={{ false: "#E5E7EB", true: "#22C55E" }}
-              thumbColor={"#FFF"}
-              ios_backgroundColor="#E5E7EB"
-              onValueChange={() => setIsEmergencyEnabled(!isEmergencyEnabled)}
-              value={isEmergencyEnabled}
-              style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-            />
           </View>
 
           <View style={styles.monitoringIcons}>
