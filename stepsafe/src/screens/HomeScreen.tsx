@@ -83,7 +83,7 @@ export default function HomeScreen() {
         <View style={styles.bottomPanel}>
           <View style={styles.locationRow}>
             <View style={styles.dotCurrent} />
-            <Text style={styles.locationText}>Current: UI Campus Library</Text>
+            <Text style={styles.locationText}>Current: Universitas Multimedia Nusantara</Text>
           </View>
           
           <View style={styles.locationConnector} />
