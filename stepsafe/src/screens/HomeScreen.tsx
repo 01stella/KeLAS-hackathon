@@ -56,6 +56,27 @@ export default function HomeScreen() {
             </Text>
           </View>
 
+          {/* INTEGRATED CARD BADGE */}
+          <View style={{ 
+            flexDirection: 'row', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            backgroundColor: '#F8FAFC', 
+            paddingHorizontal: 10, 
+            paddingVertical: 6, 
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+            marginBottom: 12 
+          }}>
+            <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '500' }}>
+              ⌚ Smartwatch Paired
+            </Text>
+            <Text style={{ color: '#0F172A', fontSize: 12, fontWeight: 'bold' }}>
+              <Text style={{ color: '#10B981' }}>♥</Text> 76 BPM
+            </Text>
+          </View>
+
           <TouchableOpacity 
             style={[styles.startButton, !destination && styles.startButtonDisabled]} 
             onPress={handleStartJourney}
