@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TextInput, TouchableOpacity, SafeAreaView, Platform, StatusBar, KeyboardAvoidingView } from 'react-native';
+import AppMap from '../components/AppMap';
+import { StyleSheet, Text, View, TextInput, TouchableOpacity, Platform, StatusBar, KeyboardAvoidingView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
@@ -13,10 +15,8 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Fake Map Background */}
       <View style={styles.mapBackground}>
-        <Ionicons name="map-outline" size={80} color="#D1D5DB" />
-        <Text style={styles.mapPlaceholderText}>[ Live Map Renders Here ]</Text>
+        <AppMap />
       </View>
 
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
@@ -87,6 +87,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  map: {
+  width: '100%',
+  height: '100%',
+},
   mapPlaceholderText: {
     color: '#9CA3AF',
     marginTop: 12,
