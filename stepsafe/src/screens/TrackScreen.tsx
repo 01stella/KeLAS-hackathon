@@ -1,9 +1,78 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar, Switch } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { StyleSheet, Text, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, StatusBar, Switch, Alert } from 'react-native';
 import { Ionicons, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import Slider from '@react-native-community/slider';
 
 export default function TrackScreen() {
   const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(true);
+  
+  // State for BPM Logic
+  const [bpm, setBpm] = useState(75);
+  const [isWarningActive, setIsWarningActive] = useState(false);
+  
+  // Timer Ref for SOS
+  const sosTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Derived state to check if current BPM is dangerous
+  const isAbnormal = bpm < 40 || bpm > 160;
+  const statusColor = isAbnormal ? '#EF4444' : '#22C55E';
+
+  // Biometric Monitoring Effect
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+
+    if (isAbnormal && !isWarningActive) {
+      // Starts the 5-second countdown the moment it hits abnormal
+      timer = setTimeout(() => {
+        triggerWarning();
+      }, 5000);
+    }
+
+    // This cleans up and cancels the timer ONLY if the user slides back 
+    // to a normal BPM before the 5 seconds run out.
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isAbnormal, isWarningActive]);
+
+  const triggerWarning = () => {
+    setIsWarningActive(true);
+    
+    sosTimerRef.current = setTimeout(() => {
+      triggerSOS();
+    }, 5000);
+
+    Alert.alert(
+      "Safety Alert",
+      `Are you okay? The BPM is too ${bpm > 160 ? 'high' : 'low'}.`,
+      [
+        {
+          text: "I'm Safe",
+          onPress: () => cancelWarning(),
+          style: "cancel"
+        }
+      ],
+      { cancelable: false } 
+    );
+  };
+
+  const cancelWarning = () => {
+    setIsWarningActive(false);
+    
+    if (sosTimerRef.current) {
+      clearTimeout(sosTimerRef.current);
+      sosTimerRef.current = null;
+    }
+  };
+
+  const triggerSOS = () => {
+    setIsWarningActive(false); 
+    
+    Alert.alert(
+      "SOS TRIGGERED", 
+      "No response received. Initiating WhatsApp emergency broadcast via Fonnte..."
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -43,26 +112,28 @@ export default function TrackScreen() {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <View style={[styles.iconBox, { backgroundColor: '#FEE2E2' }]}>
-                <Ionicons name="heart" size={16} color="#EF4444" />
+              <View style={[styles.iconBox, { backgroundColor: isAbnormal ? '#FEE2E2' : '#DCFCE7' }]}>
+                <Ionicons name="heart" size={16} color={statusColor} />
               </View>
               <Text style={styles.cardTitle}>Heart Rate</Text>
             </View>
             <View style={styles.liveIndicator}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>Live</Text>
+              <View style={[styles.liveDot, { backgroundColor: statusColor }]} />
+              <Text style={[styles.liveText, { color: statusColor }]}>Live</Text>
             </View>
           </View>
 
           <View style={styles.heartRateContent}>
             {/* Circular Progress Mockup */}
             <View style={styles.hrRingContainer}>
-              <View style={styles.hrRingOuter}>
+              <View style={[styles.hrRingOuter, { borderTopColor: statusColor, borderRightColor: statusColor }]}>
                 <View style={styles.hrRingInner}>
-                  <Ionicons name="heart-half" size={20} color="#EF4444" style={{marginBottom: 4}}/>
-                  <Text style={styles.hrBigNumber}>86</Text>
+                  <Ionicons name="heart-half" size={20} color={statusColor} style={{marginBottom: 4}}/>
+                  <Text style={styles.hrBigNumber}>{Math.round(bpm)}</Text>
                   <Text style={styles.hrUnit}>BPM</Text>
-                  <Text style={styles.hrStatus}>Normal</Text>
+                  <Text style={[styles.hrStatus, { color: statusColor }]}>
+                    {isAbnormal ? "Abnormal" : "Normal"}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -75,16 +146,16 @@ export default function TrackScreen() {
               </View>
               <View style={styles.hrStatItem}>
                 <Text style={styles.hrStatLabel}>Max</Text>
-                <Text style={styles.hrStatValue}><Text style={{color: '#EF4444'}}>112</Text> BPM</Text>
+                <Text style={styles.hrStatValue}><Text style={{color: '#EF4444'}}>172</Text> BPM</Text>
               </View>
               <View style={styles.hrStatItem}>
                 <Text style={styles.hrStatLabel}>Latest</Text>
-                <Text style={styles.hrStatValue}><Text style={{color: '#22C55E'}}>86</Text> BPM</Text>
+                <Text style={styles.hrStatValue}><Text style={{color: statusColor}}>{Math.round(bpm)}</Text> BPM</Text>
               </View>
             </View>
           </View>
 
-          {/* Faux Chart Area (Using stylized bars for compatibility) */}
+          {/* Faux Chart Area */}
           <View style={styles.chartContainer}>
             <View style={styles.chartGrid}>
               {[150, 120, 90, 60, 30, 0].map((val) => (
@@ -96,11 +167,10 @@ export default function TrackScreen() {
             </View>
             
             <View style={styles.chartBars}>
-              {/* Generating random-looking bars to simulate the wave */}
               {[40, 45, 42, 50, 48, 40, 35, 45, 55, 60, 58, 55, 52, 48, 55, 60, 58, 50, 45, 40, 35, 30, 40, 45, 50, 55, 58, 50, 48, 45, 50, 55, 60, 55, 50, 45, 48, 45, 40].map((height, i) => (
-                <View key={i} style={[styles.chartBar, { height: height + '%' }]} />
+                <View key={i} style={[styles.chartBar, { height: height + '%', backgroundColor: isAbnormal ? '#FCA5A5' : '#86EFAC' }]} />
               ))}
-              <View style={styles.chartLatestDot} />
+              <View style={[styles.chartLatestDot, { backgroundColor: statusColor }]} />
             </View>
 
             <View style={styles.chartXAxis}>
@@ -109,9 +179,27 @@ export default function TrackScreen() {
               <Text style={styles.chartXLabel}>09:38</Text>
               <Text style={styles.chartXLabel}>09:39</Text>
               <Text style={styles.chartXLabel}>09:40</Text>
-              <Text style={styles.chartXLabel}>09:41</Text>
+              <Text style={styles.chartXLabel}>Live</Text>
             </View>
           </View>
+
+          {/* BPM Simulator Slider */}
+          <View style={styles.simulatorContainer}>
+            <Text style={styles.simulatorLabel}>
+              Simulator: Slide to trigger anomaly
+            </Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={1}
+              maximumValue={200}
+              value={bpm}
+              onValueChange={(val) => setBpm(val)}
+              minimumTrackTintColor={statusColor}
+              maximumTrackTintColor="#E5E7EB"
+              thumbTintColor={statusColor}
+            />
+          </View>
+
         </View>
 
         {/* Gyroscope Card */}
@@ -209,21 +297,10 @@ export default function TrackScreen() {
         </View>
 
       </ScrollView>
-
-      {/* Static Bottom Tab Bar */}
     </SafeAreaView>
   );
 }
 
-// Reusable Tab Component
-const TabItem = ({ icon, label, active }: { icon: any, label: string, active?: boolean }) => (
-  <TouchableOpacity style={styles.tabItem}>
-    <Ionicons name={icon} size={24} color={active ? '#22C55E' : '#888'} />
-    <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{label}</Text>
-  </TouchableOpacity>
-);
-
-// Styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -232,7 +309,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 100, // Space for bottom tab
+    paddingBottom: 100, 
   },
   header: {
     flexDirection: 'row',
@@ -374,13 +451,11 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#22C55E',
     marginRight: 4,
   },
   liveText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#22C55E',
   },
   heartRateContent: {
     flexDirection: 'row',
@@ -398,17 +473,15 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 70,
     borderWidth: 6,
-    borderColor: '#FEE2E2',
-    borderTopColor: '#EF4444',
-    borderRightColor: '#EF4444',
+    borderColor: '#F3F4F6', 
     justifyContent: 'center',
     alignItems: 'center',
-    transform: [{ rotate: '-45deg' }], // Fakes the partial ring look
+    transform: [{ rotate: '-45deg' }], 
   },
   hrRingInner: {
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ rotate: '45deg' }], // Corrects text rotation
+    transform: [{ rotate: '45deg' }], 
   },
   hrBigNumber: {
     fontSize: 36,
@@ -425,7 +498,6 @@ const styles = StyleSheet.create({
   hrStatus: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#22C55E',
   },
   hrStats: {
     justifyContent: 'center',
@@ -443,7 +515,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111',
   },
-  // Faux Chart Styles
   chartContainer: {
     height: 120,
     position: 'relative',
@@ -479,7 +550,6 @@ const styles = StyleSheet.create({
   },
   chartBar: {
     width: 2,
-    backgroundColor: '#FCA5A5',
     borderTopLeftRadius: 2,
     borderTopRightRadius: 2,
   },
@@ -490,7 +560,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#EF4444',
     borderWidth: 2,
     borderColor: '#FFF',
   },
@@ -504,7 +573,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#9CA3AF',
   },
-  // Gyroscope
+  simulatorContainer: {
+    marginTop: 24,
+    alignItems: 'center',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6'
+  },
+  simulatorLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 12,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
   normalBadge: {
     backgroundColor: '#EFF6FF',
     paddingHorizontal: 10,
@@ -581,30 +665,4 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#666',
   },
-  // Bottom Tab
-  bottomTab: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    backgroundColor: '#FFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-  },
-  tabItem: {
-    alignItems: 'center',
-  },
-  tabLabel: {
-    fontSize: 10,
-    color: '#888',
-    marginTop: 4,
-  },
-  tabLabelActive: {
-    color: '#22C55E',
-    fontWeight: '600',
-  }
 });
